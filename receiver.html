@@ -6,16 +6,18 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #status { margin-bottom: 20px; font-size: 1.2rem; color: #00d1b2; }
-        #qrcode { padding: 20px; background: white; border-radius: 10px; }
-        video { width: 90vw; max-height: 80vh; border: 2px solid #333; display: none; background: #000; }
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #status { margin-bottom: 20px; font-size: 1.2rem; color: #00d1b2; text-align: center; }
+        #qrcode { padding: 20px; background: white; border-radius: 10px; transition: 0.3s; }
+        video { width: 90vw; max-height: 85vh; border: 2px solid #333; display: none; background: #000; border-radius: 8px; }
+        .id-display { margin-top: 10px; font-size: 0.8rem; color: #666; }
     </style>
 </head>
 <body>
 
-    <div id="status">正在初始化連線 ID...</div>
+    <div id="status">正在建立連線通道...</div>
     <div id="qrcode"></div>
+    <div class="id-display" id="peerIdShow"></div>
     <video id="remoteVideo" autoplay playsinline></video>
 
     <script>
@@ -23,32 +25,43 @@
         const statusEl = document.getElementById('status');
         const qrEl = document.getElementById('qrcode');
         const videoEl = document.getElementById('remoteVideo');
+        const idShow = document.getElementById('peerIdShow');
 
         peer.on('open', (id) => {
-            statusEl.innerText = "請使用手機掃描下方 QR Code 開始投影";
+            statusEl.innerText = "請使用手機掃描 QR Code 開始投影";
+            idShow.innerText = "連線 ID: " + id;
             
-            // 建立指向發送端網頁的連結，並帶入 ID 參數
-            // 注意：請將 'YOUR_DEPLOYED_URL' 替換為你上傳 sender.html 的實際網址
-            const senderUrl = window.location.href.replace('receiver.html', 'sender.html') + "?id=" + id;
+            // 強制抓取目前的目錄路徑，確保指向同一個資料夾下的 sender.html
+            const currentPath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+            const senderUrl = window.location.origin + currentPath + "/sender.html?id=" + id;
             
+            // 清除舊的 QR Code 並產生新的
+            qrEl.innerHTML = "";
             new QRCode(qrEl, {
                 text: senderUrl,
                 width: 256,
                 height: 256
             });
-            console.log("連線網址:", senderUrl);
+            console.log("手機應開啟的網址:", senderUrl);
         });
 
-        // 監聽來自手機的呼叫
+        // 當接收到手機的「撥號」時
         peer.on('call', (call) => {
-            statusEl.innerText = "正在接收畫面...";
-            call.answer(); // 接聽
+            statusEl.innerText = "連線成功！正在接收畫面...";
+            call.answer(); 
             
             call.on('stream', (remoteStream) => {
-                qrEl.style.display = 'none'; // 隱藏二維碼
-                videoEl.style.display = 'block'; // 顯示影片
+                qrEl.style.display = 'none'; 
+                idShow.style.display = 'none';
+                videoEl.style.display = 'block'; 
                 videoEl.srcObject = remoteStream;
+                statusEl.innerText = "正在投影中";
             });
+        });
+
+        peer.on('error', (err) => {
+            statusEl.innerText = "發生錯誤: " + err.type;
+            console.error(err);
         });
     </script>
 </body>
