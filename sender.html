@@ -3,73 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>發送端 - 手機投影</title>
+    <title>手機發送端</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f0f2f5; }
-        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 80%; }
-        button { padding: 15px 30px; font-size: 1.2rem; background: #007bff; color: white; border: none; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; }
-        button:active { background: #0056b3; transform: scale(0.98); }
-        button:disabled { background: #ccc; }
-        #info { margin-top: 15px; color: #666; font-size: 0.9rem; line-height: 1.5; }
-        .status-dot { display: inline-block; width: 10px; height: 10px; background: #ff4d4f; border-radius: 50%; margin-right: 5px; }
-        .online { background: #52c41a; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f7f7f7; }
+        .btn { padding: 20px 40px; font-size: 1.5rem; background: #007bff; color: white; border: none; border-radius: 10px; cursor: pointer; }
+        .btn:disabled { background: #ccc; }
+        #status { margin-top: 20px; color: #555; text-align: center; padding: 0 20px; }
     </style>
 </head>
 <body>
-
-    <div class="card">
-        <h2>螢幕投影控制</h2>
-        <button id="startBtn">開始投影螢幕</button>
-        <div id="info">
-            <span id="dot" class="status-dot"></span>
-            <span id="statusTxt">等待讀取連線 ID...</span>
-        </div>
-    </div>
+    <button id="startBtn" class="btn">點擊開始投影</button>
+    <div id="status">正在檢查連線狀態...</div>
 
     <script>
-        const peer = new Peer();
-        const startBtn = document.getElementById('startBtn');
-        const infoEl = document.getElementById('statusTxt');
-        const dot = document.getElementById('dot');
-
         const urlParams = new URLSearchParams(window.location.search);
         const targetId = urlParams.get('id');
+        const startBtn = document.getElementById('startBtn');
+        const status = document.getElementById('status');
+        const peer = new Peer();
 
         peer.on('open', () => {
             if (targetId) {
-                infoEl.innerText = "就緒：已連接到接收端 " + targetId;
-                dot.classList.add('online');
+                status.innerText = "準備就緒，請點擊按鈕並選擇「立即開始」";
             } else {
-                infoEl.innerText = "錯誤：網址缺少 ID，請重新掃碼";
+                status.innerText = "錯誤：找不到連線 ID，請重新掃碼";
                 startBtn.disabled = true;
             }
         });
 
         startBtn.onclick = async () => {
             try {
-                // 請求錄製螢幕
-                const stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
-                    audio: true
-                });
+                // 針對三星手機優化的參數
+                const constraints = {
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        frameRate: { ideal: 20 }
+                    },
+                    audio: false // 三星手機務必設為 false 測試
+                };
 
-                infoEl.innerText = "連線中...";
-                const call = peer.call(targetId, stream);
+                const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
                 
-                infoEl.innerText = "投影中！請切換到你想分享的 App";
-                startBtn.innerText = "停止投影請重新整理網頁";
+                status.innerText = "正在傳輸畫面，請勿關閉此網頁";
+                const call = peer.call(targetId, stream);
+                startBtn.innerText = "投影中...";
                 startBtn.disabled = true;
 
-                // 監聽手動停止分享
                 stream.getVideoTracks()[0].onended = () => {
                     alert("投影已結束");
                     location.reload();
                 };
-
             } catch (err) {
                 console.error(err);
-                alert("啟動失敗！請確保：\n1. 使用 Safari 或 Chrome 瀏覽器\n2. 網址開頭是 https\n3. 已給予螢幕錄製權限");
+                // 詳細報錯，幫助我們判斷問題
+                alert("啟動失敗！\n錯誤名稱：" + err.name + "\n訊息：" + err.message);
             }
         };
     </script>
