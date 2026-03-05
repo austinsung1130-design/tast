@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>接收端 - 大螢幕投影</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        #status { margin-bottom: 20px; font-size: 1.2rem; color: #00d1b2; }
+        #qrcode { padding: 20px; background: white; border-radius: 10px; }
+        video { width: 90vw; max-height: 80vh; border: 2px solid #333; display: none; background: #000; }
+    </style>
+</head>
+<body>
+
+    <div id="status">正在初始化連線 ID...</div>
+    <div id="qrcode"></div>
+    <video id="remoteVideo" autoplay playsinline></video>
+
+    <script>
+        const peer = new Peer(); 
+        const statusEl = document.getElementById('status');
+        const qrEl = document.getElementById('qrcode');
+        const videoEl = document.getElementById('remoteVideo');
+
+        peer.on('open', (id) => {
+            statusEl.innerText = "請使用手機掃描下方 QR Code 開始投影";
+            
+            // 建立指向發送端網頁的連結，並帶入 ID 參數
+            // 注意：請將 'YOUR_DEPLOYED_URL' 替換為你上傳 sender.html 的實際網址
+            const senderUrl = window.location.href.replace('receiver.html', 'sender.html') + "?id=" + id;
+            
+            new QRCode(qrEl, {
+                text: senderUrl,
+                width: 256,
+                height: 256
+            });
+            console.log("連線網址:", senderUrl);
+        });
+
+        // 監聽來自手機的呼叫
+        peer.on('call', (call) => {
+            statusEl.innerText = "正在接收畫面...";
+            call.answer(); // 接聽
+            
+            call.on('stream', (remoteStream) => {
+                qrEl.style.display = 'none'; // 隱藏二維碼
+                videoEl.style.display = 'block'; // 顯示影片
+                videoEl.srcObject = remoteStream;
+            });
+        });
+    </script>
+</body>
+</html>
