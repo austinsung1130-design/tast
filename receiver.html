@@ -7,17 +7,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { background: #121212; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #qrcode { padding: 15px; background: white; border-radius: 8px; }
-        video { width: 90vw; max-height: 80vh; display: none; background: black; border: 2px solid #333; }
-        #msg { margin-bottom: 20px; font-size: 1.2rem; }
+        #qrcode { padding: 15px; background: white; border-radius: 8px; margin: 20px; }
+        video { width: 90vw; max-height: 80vh; display: none; background: black; border: 2px solid #00d1b2; border-radius: 10px; }
+        #msg { font-size: 1.2rem; color: #00d1b2; }
     </style>
 </head>
 <body>
-    <div id="msg">正在準備連線...</div>
+    <div id="msg">正在初始化連線 ID...</div>
     <div id="qrcode"></div>
     <video id="remoteVideo" autoplay playsinline></video>
 
     <script>
+        // 強制 HTTPS
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+            location.replace(`https:${location.href.substring(location.protocol.length)}`);
+        }
+
         const peer = new Peer();
         const msg = document.getElementById('msg');
         const qrBox = document.getElementById('qrcode');
@@ -25,24 +30,25 @@
 
         peer.on('open', (id) => {
             msg.innerText = "請掃描 QR Code 開始投影";
-            // 自動偵測當前網址並指向同資料夾的 sender.html
             const path = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
             const url = window.location.origin + path + "/sender.html?id=" + id;
             
+            qrBox.innerHTML = "";
             new QRCode(qrBox, { text: url, width: 250, height: 250 });
-            console.log("手機應開啟：", url);
+            console.log("連線網址：", url);
         });
 
         peer.on('call', (call) => {
-            msg.innerText = "連線中...";
+            msg.innerText = "連線成功，正在接收畫面...";
             call.answer();
             call.on('stream', (stream) => {
                 qrBox.style.display = 'none';
                 video.style.display = 'block';
                 video.srcObject = stream;
-                msg.innerText = "正在投影畫面";
             });
         });
+
+        peer.on('error', err => { alert("連線錯誤: " + err.type); });
     </script>
 </body>
 </html>

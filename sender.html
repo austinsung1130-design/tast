@@ -6,17 +6,22 @@
     <title>手機發送端</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f7f7f7; }
-        .btn { padding: 20px 40px; font-size: 1.5rem; background: #007bff; color: white; border: none; border-radius: 10px; cursor: pointer; }
-        .btn:disabled { background: #ccc; }
-        #status { margin-top: 20px; color: #555; text-align: center; padding: 0 20px; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f0f0f0; }
+        .btn { padding: 18px 36px; font-size: 1.4rem; background: #007bff; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .btn:disabled { background: #999; }
+        #status { margin-top: 25px; color: #444; font-weight: bold; padding: 0 20px; text-align: center; }
     </style>
 </head>
 <body>
-    <button id="startBtn" class="btn">點擊開始投影</button>
-    <div id="status">正在檢查連線狀態...</div>
+    <button id="startBtn" class="btn">開始分享螢幕</button>
+    <div id="status">檢查連線中...</div>
 
     <script>
+        // 強制 HTTPS (解決 TypeError 的關鍵)
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+            location.replace(`https:${location.href.substring(location.protocol.length)}`);
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const targetId = urlParams.get('id');
         const startBtn = document.getElementById('startBtn');
@@ -25,40 +30,39 @@
 
         peer.on('open', () => {
             if (targetId) {
-                status.innerText = "準備就緒，請點擊按鈕並選擇「立即開始」";
+                status.innerText = "已連上接收端！請按下方按鈕";
             } else {
-                status.innerText = "錯誤：找不到連線 ID，請重新掃碼";
+                status.innerText = "無效的 ID，請重新掃碼";
                 startBtn.disabled = true;
             }
         });
 
         startBtn.onclick = async () => {
-            try {
-                // 針對三星手機優化的參數
-                const constraints = {
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        frameRate: { ideal: 20 }
-                    },
-                    audio: false // 三星手機務必設為 false 測試
-                };
+            // 檢查 API 是否存在
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                alert("錯誤：此瀏覽器不支援螢幕分享，請改用 Chrome 並確認網址為 HTTPS");
+                return;
+            }
 
-                const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+            try {
+                // 三星手機最穩定的參數設定
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always" },
+                    audio: false // 關閉音訊以確保成功率
+                });
                 
-                status.innerText = "正在傳輸畫面，請勿關閉此網頁";
+                status.innerText = "投影中！請切換到你想分享的 App";
                 const call = peer.call(targetId, stream);
-                startBtn.innerText = "投影中...";
+                startBtn.innerText = "投影進行中";
                 startBtn.disabled = true;
 
                 stream.getVideoTracks()[0].onended = () => {
-                    alert("投影已結束");
+                    alert("投影停止");
                     location.reload();
                 };
             } catch (err) {
-                console.error(err);
-                // 詳細報錯，幫助我們判斷問題
-                alert("啟動失敗！\n錯誤名稱：" + err.name + "\n訊息：" + err.message);
+                // 如果失敗，抓出具體原因
+                alert("啟動失敗！\n原因: " + err.name + "\n" + err.message);
             }
         };
     </script>
