@@ -2,61 +2,54 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>發送端 - 手機投影</title>
+    <title>接收端 - 大螢幕投影</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f4f9; }
-        button { padding: 20px 40px; font-size: 1.5rem; background: #007bff; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,123,255,0.3); }
-        button:disabled { background: #ccc; }
-        #info { margin-top: 20px; color: #666; }
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        #status { margin-bottom: 20px; font-size: 1.2rem; color: #00d1b2; }
+        #qrcode { padding: 20px; background: white; border-radius: 10px; }
+        video { width: 90vw; max-height: 80vh; border: 2px solid #333; display: none; background: #000; }
     </style>
 </head>
 <body>
 
-    <button id="startBtn">點擊開始投影</button>
-    <div id="info">等待掃描...</div>
+    <div id="status">正在初始化連線 ID...</div>
+    <div id="qrcode"></div>
+    <video id="remoteVideo" autoplay playsinline></video>
 
     <script>
-        const peer = new Peer();
-        const startBtn = document.getElementById('startBtn');
-        const infoEl = document.getElementById('info');
+        const peer = new Peer(); 
+        const statusEl = document.getElementById('status');
+        const qrEl = document.getElementById('qrcode');
+        const videoEl = document.getElementById('remoteVideo');
 
-        // 從網址獲取接收端的 ID
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetId = urlParams.get('id');
+        peer.on('open', (id) => {
+            statusEl.innerText = "請使用手機掃描下方 QR Code 開始投影";
+            
+            // 建立指向發送端網頁的連結，並帶入 ID 參數
+            // 注意：請將 'YOUR_DEPLOYED_URL' 替換為你上傳 sender.html 的實際網址
+            const senderUrl = window.location.href.replace('receiver.html', 'sender.html') + "?id=" + id;
+            
+            new QRCode(qrEl, {
+                text: senderUrl,
+                width: 256,
+                height: 256
+            });
+            console.log("連線網址:", senderUrl);
+        });
 
-        if (targetId) {
-            infoEl.innerText = "已偵測到目標螢幕: " + targetId;
-        } else {
-            infoEl.innerText = "錯誤：找不到目標 ID，請重新掃碼";
-            startBtn.disabled = true;
-        }
-
-        startBtn.onclick = async () => {
-            try {
-                // 1. 請求螢幕擷取權限
-                const stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: "always" },
-                    audio: true
-                });
-
-                // 2. 撥打給接收端
-                const call = peer.call(targetId, stream);
-                infoEl.innerText = "連線成功！正在投影中...";
-                startBtn.innerText = "投影中";
-                startBtn.disabled = true;
-
-                // 處理停止共享
-                stream.getVideoTracks()[0].onended = () => {
-                    location.reload(); 
-                };
-
-            } catch (err) {
-                console.error("無法開啟螢幕分享:", err);
-                alert("請確保使用 HTTPS 環境或 localhost，並給予螢幕錄製權限。");
-            }
-        };
+        // 監聽來自手機的呼叫
+        peer.on('call', (call) => {
+            statusEl.innerText = "正在接收畫面...";
+            call.answer(); // 接聽
+            
+            call.on('stream', (remoteStream) => {
+                qrEl.style.display = 'none'; // 隱藏二維碼
+                videoEl.style.display = 'block'; // 顯示影片
+                videoEl.srcObject = remoteStream;
+            });
+        });
     </script>
 </body>
 </html>
